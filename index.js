@@ -1,6 +1,5 @@
 const inquirer = require("inquirer");
 const mysql = require("mysql");
-const cTable = require("console.table");
 
 const connection = mysql.createConnection({
   host: "localhost",
@@ -49,7 +48,7 @@ function welcome() {
           updateEmployeeRoles();
           break;
         case "Exit":
-          welcome();
+          process.exit(-1);
           break;
       }
     });
@@ -93,10 +92,9 @@ function addDepartment() {
     })
     //then insert that name to the sql
     .then(function (input) {
-      var query = "INSERT INTO department SET ?";
       console.log(input.departmentAdd);
       connection.query(
-        query,
+        "INSERT INTO department SET ?",
         {
           name: input.departmentAdd,
         },
@@ -197,21 +195,23 @@ function addEmployee() {
       {
         type: "input",
         message:
-          "Please enter new employee's manager's id (or NULL if manager unknown).",
+          "Please enter new employee's manager's id (or hit enter if not known).",
         name: "manager_id",
       },
     ])
 
     //add information for new employee into database
     .then(function (input) {
-      var query = "INSERT INTO employee SET ?";
+      if (input.manager_id === "") {
+        input.manager_id = null;
+      }
       connection.query(
-        query,
+        "INSERT INTO employee SET ?",
         {
           first_name: input.first_name,
           last_name: input.last_name,
           role_id: input.role_id,
-          manager_id: Number(input.manager_id),
+          manager_id: input.manager_id,
         },
         function (err, res) {
           if (err) throw err;
@@ -242,18 +242,18 @@ function viewHome() {
         type: "list",
         name: "viewHome",
         message: "What would you like to view?",
-        choices: ["View department", "View roles", "View employees", "Exit"],
+        choices: ["View departments", "View roles", "View employees", "Exit"],
       },
     ])
     .then((input) => {
       switch (input.viewHome) {
-        case "View department":
+        case "View departments":
           viewDepartments();
           break;
-        case "View role":
+        case "View roles":
           viewRoles();
           break;
-        case "Add employee":
+        case "View employees":
           viewEmployees();
           break;
         case "Exit":
@@ -264,9 +264,9 @@ function viewHome() {
 }
 
 function viewDepartments() {
-  connection.query("SELECT * from department", (err, res) => {
+  connection.query("SELECT id, name FROM department", (err, res) => {
     if (err) throw err;
-    cTable(res);
+    console.table(res);
     inquirer
       .prompt({
         name: "viewAgain",
@@ -284,43 +284,49 @@ function viewDepartments() {
 }
 
 function viewEmployees() {
-  connection.query("SELECT * from employee", (err, res) => {
-    if (err) throw err;
-    cTable(res);
-    inquirer
-      .prompt({
-        name: "viewAgain",
-        type: "confirm",
-        message: "Would you like to view something else?",
-      })
-      .then(function (input) {
-        if (input.viewAgain === true) {
-          viewHome();
-        } else {
-          welcome();
-        }
-      });
-  });
+  connection.query(
+    "SELECT id, first_name, last_name, role_id,manager_id FROM employee",
+    (err, res) => {
+      if (err) throw err;
+      console.table(res);
+      inquirer
+        .prompt({
+          name: "viewAgain",
+          type: "confirm",
+          message: "Would you like to view something else?",
+        })
+        .then(function (input) {
+          if (input.viewAgain === true) {
+            viewHome();
+          } else {
+            welcome();
+          }
+        });
+    }
+  );
 }
 
 function viewRoles() {
-  connection.query("SELECT * from role", (err, res) => {
-    if (err) throw err;
-    cTable(res);
-    inquirer
-      .prompt({
-        name: "viewAgain",
-        type: "confirm",
-        message: "Would you like to view something else?",
-      })
-      .then(function (input) {
-        if (input.viewAgain === true) {
-          viewHome();
-        } else {
-          welcome();
-        }
-      });
-  });
+  connection.query(
+    "SELECT id, title, salary, department_id FROM role",
+    (err, res) => {
+      if (err) throw err;
+      console.table(res);
+      inquirer
+        .prompt({
+          name: "viewAgain",
+          type: "confirm",
+          message: "Would you like to view something else?",
+        })
+        .then(function (input) {
+          if (input.viewAgain === true) {
+            viewHome();
+          } else {
+            welcome();
+          }
+        });
+    }
+  );
 }
 
 function updateEmployeeRoles() {
@@ -328,7 +334,7 @@ function updateEmployeeRoles() {
   inquirer
     .prompt([
       {
-        name: "roleUpdate",
+        name: "roleToUpdate",
         type: "input",
         message: "Which role did you want to update?",
       },
@@ -340,7 +346,7 @@ function updateEmployeeRoles() {
         choices: ["Title", "Salary", "Department ID"],
       },
       {
-        name: "roleInput",
+        name: "roleNewInput",
         type: "input",
         message: "Please update info here:",
       },
@@ -353,13 +359,13 @@ function updateEmployeeRoles() {
         case "Title":
           //updating title
           connection.query(
-            query,
+            "UPDATE role SET ? WHERE ?",
             [
               {
-                title: input.roleInfo,
+                title: input.roleNewInput,
               },
               {
-                title: input.roleInput,
+                title: input.roleToUpdate,
               },
             ],
             function (err, res) {
@@ -371,13 +377,13 @@ function updateEmployeeRoles() {
         case "Salary":
           //updating salary information
           connection.query(
-            query,
+            "UPDATE role SET ? WHERE ?",
             [
               {
-                Salary: input.roleInfo,
+                salary: input.roleNewInfo,
               },
               {
-                Title: input.roleInput,
+                title: input.roleToUpdate,
               },
             ],
             function (err, res) {
@@ -389,13 +395,13 @@ function updateEmployeeRoles() {
         case "Department ID":
           //updating department info
           connection.query(
-            query,
+            "UPDATE role SET ? WHERE ?",
             [
               {
-                department_id: input.roleInfo,
+                department_id: input.roleNewInfo,
               },
               {
-                title: input.roleInput,
+                title: input.roleToUpdate,
               },
             ],
             function (err, res) {
